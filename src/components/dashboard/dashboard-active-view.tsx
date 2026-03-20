@@ -1,33 +1,34 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense } from "react";
 import type { DbCampaign } from "../../services/apiClient";
 import type { GalleryImage } from "../../types";
 import { Icon } from "../common/Icon";
 import { ViewLoadingFallback, type DashboardProps } from "./dashboard-shared";
+import { lazyWithRetry } from "@/lib/asset-version-recovery";
 
-const FlyerGenerator = lazy(() =>
+const FlyerGenerator = lazyWithRetry(() =>
   import("../flyer/FlyerGenerator").then((m) => ({ default: m.FlyerGenerator })),
 );
-const SchedulesListView = lazy(() =>
+const SchedulesListView = lazyWithRetry(() =>
   import("../schedules/SchedulesListView").then((m) => ({
     default: m.SchedulesListView,
   })),
 );
-const GalleryView = lazy(() =>
+const GalleryView = lazyWithRetry(() =>
   import("../gallery/GalleryView").then((m) => ({ default: m.GalleryView })),
 );
-const CalendarView = lazy(() =>
+const CalendarView = lazyWithRetry(() =>
   import("../calendar/CalendarView").then((m) => ({ default: m.CalendarView })),
 );
-const CampaignsList = lazy(() =>
+const CampaignsList = lazyWithRetry(() =>
   import("../campaigns/CampaignsList").then((m) => ({ default: m.CampaignsList })),
 );
-const CarouselsList = lazy(() =>
+const CarouselsList = lazyWithRetry(() =>
   import("../campaigns/CarouselsList").then((m) => ({ default: m.CarouselsList })),
 );
-const PlaygroundView = lazy(() =>
+const PlaygroundView = lazyWithRetry(() =>
   import("../playground/PlaygroundView").then((m) => ({ default: m.PlaygroundView })),
 );
-const ImagePlaygroundPage = lazy(() =>
+const ImagePlaygroundPage = lazyWithRetry(() =>
   import("../image-playground/ImagePlaygroundPage").then((m) => ({
     default: m.ImagePlaygroundPage,
   })),

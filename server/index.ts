@@ -23,6 +23,7 @@ import type { BrandProfile } from "./lib/ai/prompt-builders.js";
 import { put } from "@vercel/blob";
 import { validateContentType } from "./lib/validation/contentType.js";
 import { injectNonceIntoHtml } from "./lib/spa-html.js";
+import { applySpaHtmlHeaders, applyStaticCacheHeaders } from "./lib/static-cache.js";
 
 // ============================================================================
 // TYPES
@@ -63,7 +64,14 @@ process.on("unhandledRejection", (error: unknown) => {
 // ---------------------------------------------------------------------------
 const distPath = path.join(__dirname, "../dist");
 logger.info({ distPath }, "[Static] Serving static files");
-app.use(express.static(distPath));
+app.use(
+  express.static(distPath, {
+    index: false,
+    setHeaders(res, filePath) {
+      applyStaticCacheHeaders(res, filePath);
+    },
+  }),
+);
 
 // SPA catch-all (must come after static files but before error handlers)
 app.use(async (req: Request, res: Response, next: NextFunction) => {
@@ -76,6 +84,7 @@ app.use(async (req: Request, res: Response, next: NextFunction) => {
     const html = await readFile(path.join(distPath, "index.html"), "utf8");
     const cspNonce =
       typeof res.locals.cspNonce === "string" ? res.locals.cspNonce : null;
+    applySpaHtmlHeaders(res);
 
     res
       .type("html")

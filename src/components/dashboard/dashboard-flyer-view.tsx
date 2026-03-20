@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense } from "react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { Icon } from "@/components/common/Icon";
 import { ViewLoadingFallback } from "@/components/dashboard/dashboard-shared";
@@ -6,13 +6,14 @@ import { useBrandProfileController } from "@/controllers/BrandProfileController"
 import { useCampaignController } from "@/controllers/CampaignController";
 import { useGalleryController } from "@/controllers/GalleryController";
 import { useTournamentController } from "@/controllers/TournamentController";
+import { lazyWithRetry } from "@/lib/asset-version-recovery";
 
-const FlyerGenerator = lazy(() =>
+const FlyerGenerator = lazyWithRetry(() =>
   import("@/components/flyer/FlyerGenerator").then((module) => ({
     default: module.FlyerGenerator,
   }))
 );
-const SchedulesListView = lazy(() =>
+const SchedulesListView = lazyWithRetry(() =>
   import("@/components/schedules/SchedulesListView").then((module) => ({
     default: module.SchedulesListView,
   }))

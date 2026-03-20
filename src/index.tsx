@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import { Router } from "./Router";
 import "./styles/main.css";
+import { registerAssetVersionRecovery } from "@/lib/asset-version-recovery";
 import { clientLogger } from "@/lib/client-logger";
 
 const rootElement = document.getElementById("root");
@@ -11,6 +12,7 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+registerAssetVersionRecovery();
 root.render(
   <React.StrictMode>
     <Router />

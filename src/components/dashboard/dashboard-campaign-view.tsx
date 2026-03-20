@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState, useTransition } from "react";
+import React, { Suspense, useEffect, useMemo, useState, useTransition } from "react";
 import { AnimatePresence } from "framer-motion";
 import { UploadForm } from "../campaigns/UploadForm";
 import { Icon } from "../common/Icon";
@@ -18,17 +18,18 @@ import { DEFAULT_CAMPAIGN_IMAGE_MODEL } from "../../config/imageGenerationModelO
 import { useBrandProfileController } from "@/controllers/BrandProfileController";
 import { useCampaignController } from "@/controllers/CampaignController";
 import { useGalleryController } from "@/controllers/GalleryController";
+import { lazyWithRetry } from "@/lib/asset-version-recovery";
 
-const ClipsTab = lazy(() =>
+const ClipsTab = lazyWithRetry(() =>
   import("../tabs/ClipsTab").then((m) => ({ default: m.ClipsTab })),
 );
-const CarrosselTab = lazy(() =>
+const CarrosselTab = lazyWithRetry(() =>
   import("../carousel/CarouselTab").then((m) => ({ default: m.CarouselTab })),
 );
-const PostsTab = lazy(() =>
+const PostsTab = lazyWithRetry(() =>
   import("../tabs/PostsTab").then((m) => ({ default: m.PostsTab })),
 );
-const AdCreativesTab = lazy(() =>
+const AdCreativesTab = lazyWithRetry(() =>
   import("../tabs/AdCreativesTab").then((m) => ({ default: m.AdCreativesTab })),
 );
 

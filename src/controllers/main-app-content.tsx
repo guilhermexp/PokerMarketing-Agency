@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useMemo } from "react";
+import React, { Suspense, useMemo } from "react";
 import { OnboardingModal } from "@/components/brand/OnboardingModal";
 import { SettingsModal } from "@/components/settings/SettingsModal";
 import { Loader } from "@/components/common/Loader";
@@ -10,23 +10,24 @@ import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { BrandProfileSetup, useBrandProfileController } from "@/controllers/BrandProfileController";
 import { useGalleryController } from "@/controllers/GalleryController";
 import { ChatProvider } from "@/contexts/ChatContext";
+import { lazyWithRetry } from "@/lib/asset-version-recovery";
 
-const ClientFeedback = lazy(() =>
+const ClientFeedback = lazyWithRetry(() =>
   import("@/feedback/client-feedback").then((module) => ({
     default: module.ClientFeedback,
   }))
 );
-const Dashboard = lazy(() =>
+const Dashboard = lazyWithRetry(() =>
   import("@/components/dashboard/Dashboard").then((module) => ({
     default: module.Dashboard,
   }))
 );
-const AssistantPanel = lazy(() =>
+const AssistantPanel = lazyWithRetry(() =>
   import("@/components/assistant/AssistantPanel").then((module) => ({
     default: module.AssistantPanel,
   }))
 );
-const AssistantPanelNew = lazy(() =>
+const AssistantPanelNew = lazyWithRetry(() =>
   import("@/components/assistant/AssistantPanelNew").then((module) => ({
     default: module.AssistantPanelNew,
   }))

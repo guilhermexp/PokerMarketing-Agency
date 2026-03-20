@@ -1,36 +1,37 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense } from "react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { useBrandProfileController } from "@/controllers/BrandProfileController";
 import { useCampaignController } from "@/controllers/CampaignController";
 import { useGalleryController } from "@/controllers/GalleryController";
 import { ViewLoadingFallback } from "@/components/dashboard/dashboard-shared";
+import { lazyWithRetry } from "@/lib/asset-version-recovery";
 
-const GalleryView = lazy(() =>
+const GalleryView = lazyWithRetry(() =>
   import("@/components/gallery/GalleryView").then((module) => ({
     default: module.GalleryView,
   }))
 );
-const CalendarView = lazy(() =>
+const CalendarView = lazyWithRetry(() =>
   import("@/components/calendar/CalendarView").then((module) => ({
     default: module.CalendarView,
   }))
 );
-const CampaignsList = lazy(() =>
+const CampaignsList = lazyWithRetry(() =>
   import("@/components/campaigns/CampaignsList").then((module) => ({
     default: module.CampaignsList,
   }))
 );
-const CarouselsList = lazy(() =>
+const CarouselsList = lazyWithRetry(() =>
   import("@/components/campaigns/CarouselsList").then((module) => ({
     default: module.CarouselsList,
   }))
 );
-const PlaygroundView = lazy(() =>
+const PlaygroundView = lazyWithRetry(() =>
   import("@/components/playground/PlaygroundView").then((module) => ({
     default: module.PlaygroundView,
   }))
 );
-const ImagePlaygroundPage = lazy(() =>
+const ImagePlaygroundPage = lazyWithRetry(() =>
   import("@/components/image-playground/ImagePlaygroundPage").then((module) => ({
     default: module.ImagePlaygroundPage,
   }))

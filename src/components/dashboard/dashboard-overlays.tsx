@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense } from "react";
 import { QuickPostModal } from "@/components/common/QuickPostModal";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { PublishedStoriesWidget } from "@/components/ui/published-stories-widget";
@@ -6,23 +6,24 @@ import { ViewLoadingFallback } from "@/components/dashboard/dashboard-shared";
 import { useBrandProfileController } from "@/controllers/BrandProfileController";
 import { useGalleryController } from "@/controllers/GalleryController";
 import { authClient } from "@/lib/auth-client";
+import { lazyWithRetry } from "@/lib/asset-version-recovery";
 
-const SchedulePostModal = lazy(() =>
+const SchedulePostModal = lazyWithRetry(() =>
   import("@/components/calendar/SchedulePostModal").then((module) => ({
     default: module.SchedulePostModal,
   }))
 );
-const ImagePreviewModal = lazy(() =>
+const ImagePreviewModal = lazyWithRetry(() =>
   import("@/components/image-preview/ImagePreviewModal").then((module) => ({
     default: module.ImagePreviewModal,
   }))
 );
-const AssistantPanel = lazy(() =>
+const AssistantPanel = lazyWithRetry(() =>
   import("@/components/assistant/AssistantPanel").then((module) => ({
     default: module.AssistantPanel,
   }))
 );
-const AssistantPanelNew = lazy(() =>
+const AssistantPanelNew = lazyWithRetry(() =>
   import("@/components/assistant/AssistantPanelNew").then((module) => ({
     default: module.AssistantPanelNew,
   }))

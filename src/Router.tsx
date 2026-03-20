@@ -3,44 +3,45 @@
  * Handles routing between main app and admin panel
  */
 
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { lazyWithRetry } from '@/lib/asset-version-recovery';
 import { Loader } from './components/common/Loader';
 
 // Lazy load admin panel for code splitting
-const AdminApp = lazy(() =>
+const AdminApp = lazyWithRetry(() =>
   import('./components/admin/AdminApp').then((m) => ({ default: m.AdminApp })),
 );
 
 // Dev-only: Error notification test page
-const ErrorNotificationTest = lazy(() =>
+const ErrorNotificationTest = lazyWithRetry(() =>
   import('./components/test/ErrorNotificationTest').then((m) => ({
     default: m.ErrorNotificationTest,
   }))
 );
 
-const CampaignView = lazy(() =>
+const CampaignView = lazyWithRetry(() =>
   import('./views/campaign-view').then((m) => ({ default: m.CampaignView })),
 );
-const CampaignsView = lazy(() =>
+const CampaignsView = lazyWithRetry(() =>
   import('./views/campaigns-view').then((m) => ({ default: m.CampaignsView })),
 );
-const CarouselsView = lazy(() =>
+const CarouselsView = lazyWithRetry(() =>
   import('./views/carousels-view').then((m) => ({ default: m.CarouselsView })),
 );
-const FlyerView = lazy(() =>
+const FlyerView = lazyWithRetry(() =>
   import('./views/flyer-view').then((m) => ({ default: m.FlyerView })),
 );
-const GalleryView = lazy(() =>
+const GalleryView = lazyWithRetry(() =>
   import('./views/gallery-view').then((m) => ({ default: m.GalleryView })),
 );
-const CalendarView = lazy(() =>
+const CalendarView = lazyWithRetry(() =>
   import('./views/calendar-view').then((m) => ({ default: m.CalendarView })),
 );
-const PlaygroundView = lazy(() =>
+const PlaygroundView = lazyWithRetry(() =>
   import('./views/playground-view').then((m) => ({ default: m.PlaygroundView })),
 );
-const ImagePlaygroundView = lazy(() =>
+const ImagePlaygroundView = lazyWithRetry(() =>
   import('./views/image-playground-view').then((m) => ({
     default: m.ImagePlaygroundView,
   })),
