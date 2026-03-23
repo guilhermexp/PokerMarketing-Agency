@@ -660,7 +660,8 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                         <label className="text-[10px] font-bold text-white/30 uppercase tracking-wider">Engine IA</label>
                         <select value={selectedImageModel} onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
                           className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-4 py-2.5 text-sm text-white/80 outline-none appearance-none cursor-pointer hover:bg-white/[0.06] transition-all">
-                          <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
+                          <option value="nano-banana-2">Nano Banana 2</option>
+                          <option value="nano-banana-pro">Nano Banana Pro</option>
                         </select>
                       </div>
                       <div className="space-y-2">

@@ -59,11 +59,14 @@ export const useFlyerGenerator = (
     });
 
     const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(() => {
-        if (typeof window === 'undefined') return "gemini-3-pro-image-preview";
-        return (
-            (localStorage.getItem("flyer_imageModel") as ImageModel) ||
-            "gemini-3-pro-image-preview"
-        );
+        if (typeof window === 'undefined') return "nano-banana-2";
+        const saved = localStorage.getItem("flyer_imageModel") as ImageModel | null;
+        // Migrate legacy model names to current ones
+        if (saved === "gemini-3-pro-image-preview" || saved === "gemini-3.1-flash-image-preview") {
+            localStorage.setItem("flyer_imageModel", "nano-banana-2");
+            return "nano-banana-2";
+        }
+        return saved || "nano-banana-2";
     });
 
     const [showIndividualTournaments, setShowIndividualTournaments] = useState(false);
