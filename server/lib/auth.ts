@@ -338,6 +338,10 @@ export function enforceAuthenticatedIdentity(req: Request, res: Response, next: 
   );
 
   if (mismatchedUserId) {
+    logger.warn(
+      { url: req.url, method: req.method, authUserId, queryUserIds, bodyUserIds },
+      "[AuthIdentity] User context mismatch"
+    );
     res.status(403).json({
       error: "User context mismatch",
       code: "FORBIDDEN_USER_CONTEXT",
@@ -360,6 +364,10 @@ export function enforceAuthenticatedIdentity(req: Request, res: Response, next: 
   if (authOrgId) {
     const mismatchedOrgId = allOrgIds.find((value) => value !== authOrgId);
     if (mismatchedOrgId) {
+      logger.warn(
+        { url: req.url, method: req.method, authOrgId, requestOrgIds: allOrgIds },
+        "[AuthIdentity] Organization context mismatch"
+      );
       res.status(403).json({
         error: "Organization context mismatch",
         code: "FORBIDDEN_ORG_CONTEXT",
@@ -367,6 +375,10 @@ export function enforceAuthenticatedIdentity(req: Request, res: Response, next: 
       return;
     }
   } else if (allOrgIds.length > 0) {
+    logger.warn(
+      { url: req.url, method: req.method, authOrgId, requestOrgIds: allOrgIds, sessionRaw: JSON.stringify(req.authSession) },
+      "[AuthIdentity] Organization context not available in session"
+    );
     res.status(403).json({
       error: "Organization context not available in authentication token",
       code: "FORBIDDEN_ORG_CONTEXT",
