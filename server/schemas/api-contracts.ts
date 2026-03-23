@@ -143,7 +143,7 @@ const jsonNestedValue: z.ZodType = z.lazy(() =>
   z.union([jsonScalarSchema, jsonPrimitiveArraySchema, z.array(jsonNestedValue), z.record(z.string(), jsonNestedValue)]),
 );
 const jsonObjectSchema = z.record(z.string(), jsonNestedValue);
-const jsonLikeSchema = z.union([jsonScalarSchema, jsonPrimitiveArraySchema, jsonObjectSchema]);
+const jsonLikeSchema = z.union([jsonScalarSchema, jsonPrimitiveArraySchema, z.array(jsonNestedValue), jsonObjectSchema]);
 // Dynamic API payloads that vary by provider/model stay explicit and OpenAPI-safe.
 const genericRecordSchema = z.record(z.string(), jsonLikeSchema);
 const genericEntitySchema = z.object({ id: idSchema.optional() }).catchall(jsonLikeSchema);
@@ -403,7 +403,7 @@ const batchSchema = z.object({
   config: z.record(z.string(), jsonLikeSchema),
   width: z.number().nullable(),
   height: z.number().nullable(),
-  createdAt: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
   userEmail: z.string().nullable(),
   generations: z.array(generationJsonSchema),
 });
