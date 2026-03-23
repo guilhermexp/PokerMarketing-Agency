@@ -114,6 +114,7 @@ interface UseTournamentHandlersParams {
   setAllSchedules: (action: SetStateAction<WeekScheduleWithCount[]>) => void;
   setDailyFlyerState: (action: SetStateAction<DailyFlyerState>) => void;
   setHasRestoredDailyFlyers: (restored: boolean) => void;
+  setTournamentDataCache?: (data: { schedule: WeekScheduleWithCount; events: DbTournamentEvent[] }) => void;
 }
 
 interface TournamentHandlers {
@@ -138,6 +139,7 @@ export function useTournamentHandlers({
   setAllSchedules,
   setDailyFlyerState,
   setHasRestoredDailyFlyers,
+  setTournamentDataCache,
 }: UseTournamentHandlersParams): TournamentHandlers {
   const handleSelectSchedule = useCallback(
     async (schedule: WeekScheduleWithCount) => {
@@ -158,6 +160,11 @@ export function useTournamentHandlers({
         const mappedEvents: TournamentEvent[] =
           eventsData.events.map(mapDbEventToTournamentEvent);
         setTournamentEvents(mappedEvents);
+
+        // Update SWR cache so the sync effect doesn't clear these events
+        if (setTournamentDataCache) {
+          setTournamentDataCache({ schedule, events: eventsData.events });
+        }
 
         // Only clear daily flyer state when SWITCHING schedules (not on initial load or reload)
         if (isSwitchingSchedule) {
@@ -209,6 +216,7 @@ export function useTournamentHandlers({
       setIsWeekExpired,
       setDailyFlyerState,
       setHasRestoredDailyFlyers,
+      setTournamentDataCache,
     ]
   );
 

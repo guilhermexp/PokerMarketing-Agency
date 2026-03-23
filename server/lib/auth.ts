@@ -376,7 +376,7 @@ export function enforceAuthenticatedIdentity(req: Request, res: Response, next: 
     }
   } else if (allOrgIds.length > 0) {
     logger.warn(
-      { url: req.url, method: req.method, authOrgId, requestOrgIds: allOrgIds, sessionRaw: JSON.stringify(req.authSession) },
+      { url: req.url, method: req.method, authOrgId, requestOrgIds: allOrgIds },
       "[AuthIdentity] Organization context not available in session"
     );
     res.status(403).json({

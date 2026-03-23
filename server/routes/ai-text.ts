@@ -25,8 +25,8 @@ import {
 import {
   mapAspectRatio,
   DEFAULT_IMAGE_MODEL,
+  generateImageWithFallback,
 } from "../lib/ai/image-generation.js";
-import { runWithProviderFallback } from "../lib/ai/image-providers.js";
 import {
   DEFAULT_TEXT_MODEL,
   DEFAULT_FAST_TEXT_MODEL,
@@ -150,6 +150,7 @@ export function registerAiTextRoutes(app: Application): void {
         logo,
         referenceImage,
         aspectRatio = "9:16",
+        model: requestedModel,
         collabLogo: collabLogoSingular,
         collabLogos, // Frontend sends array
         imageSize = "1K",
@@ -315,15 +316,16 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           mimeType: p.inlineData.mimeType,
         }));
 
-      logger.info({}, "[Flyer API] Using provider chain");
+      const flyerModel = requestedModel || DEFAULT_IMAGE_MODEL;
+      logger.info({ model: flyerModel }, "[Flyer API] Generating with model");
 
-      const providerResult = await runWithProviderFallback("generate", {
-        prompt: textPrompt,
-        aspectRatio: mapAspectRatio(aspectRatio),
+      const providerResult = await generateImageWithFallback(
+        textPrompt,
+        mapAspectRatio(aspectRatio),
+        flyerModel,
         imageSize,
-        productImages: imageInputs.length > 0 ? imageInputs : undefined,
-        modelTier: "pro", // Always use Pro for flyers (typography)
-      });
+        imageInputs.length > 0 ? imageInputs : undefined,
+      );
 
       let imageDataUrl = providerResult.imageUrl;
       const usedProvider = providerResult.usedProvider;

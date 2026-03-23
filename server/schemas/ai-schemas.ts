@@ -218,13 +218,14 @@ export type AiCampaignBody = z.infer<typeof aiCampaignBodySchema>;
 export const aiFlyerBodySchema = z.object({
   prompt: z.string().trim().min(1),
   brandProfile: aiTextBrandProfileSchema,
-  logo: imageReferenceSchema.optional(),
-  referenceImage: imageReferenceSchema.optional(),
+  logo: imageReferenceSchema.nullish(),
+  referenceImage: imageReferenceSchema.nullish(),
   aspectRatio: optionalString,
-  collabLogo: imageReferenceSchema.optional(),
-  collabLogos: z.array(imageReferenceSchema).optional(),
+  model: optionalString,
+  collabLogo: imageReferenceSchema.nullish(),
+  collabLogos: z.array(imageReferenceSchema).nullish(),
   imageSize: optionalString,
-  compositionAssets: z.array(imageReferenceSchema).optional(),
+  compositionAssets: z.array(imageReferenceSchema).nullish(),
 });
 
 export type AiFlyerBody = z.infer<typeof aiFlyerBodySchema>;

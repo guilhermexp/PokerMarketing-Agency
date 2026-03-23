@@ -110,7 +110,7 @@ export function TournamentController({ children }: TournamentControllerProps) {
     (state) => state.setHasAutoLoadedSchedule
   );
 
-  const { schedule: swrTournamentSchedule, events: swrTournamentEvents } =
+  const { schedule: swrTournamentSchedule, events: swrTournamentEvents, setData: setTournamentDataCache } =
     useTournamentData(userId, organizationId);
   const { schedules: swrAllSchedules } = useSchedulesList(userId, organizationId);
 
@@ -130,6 +130,7 @@ export function TournamentController({ children }: TournamentControllerProps) {
     setAllSchedules,
     setDailyFlyerState,
     setHasRestoredDailyFlyers,
+    setTournamentDataCache,
   });
 
   useDailyFlyersSync({

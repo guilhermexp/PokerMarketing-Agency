@@ -206,6 +206,7 @@ export const generateFlyer = async (
     logo,
     referenceImage,
     aspectRatio,
+    model,
     collabLogos,
     imageSize,
     compositionAssets,
