@@ -139,10 +139,10 @@ const jsonPrimitiveArraySchema = z.union([
   z.array(z.number()),
   z.array(z.boolean()),
 ]);
-const jsonObjectSchema = z.record(
-  z.string(),
-  z.union([jsonScalarSchema, jsonPrimitiveArraySchema]),
+const jsonNestedValue: z.ZodType = z.lazy(() =>
+  z.union([jsonScalarSchema, jsonPrimitiveArraySchema, z.array(jsonNestedValue), z.record(z.string(), jsonNestedValue)]),
 );
+const jsonObjectSchema = z.record(z.string(), jsonNestedValue);
 const jsonLikeSchema = z.union([jsonScalarSchema, jsonPrimitiveArraySchema, jsonObjectSchema]);
 // Dynamic API payloads that vary by provider/model stay explicit and OpenAPI-safe.
 const genericRecordSchema = z.record(z.string(), jsonLikeSchema);

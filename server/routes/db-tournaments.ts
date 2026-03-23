@@ -121,7 +121,7 @@ app.get("/api/db/tournaments", validateRequest({ query: tournamentsQuerySchema }
         WHERE week_schedule_id = ${week_schedule_id}
         ORDER BY day_of_week, name
       `;
-      return res.json({ events });
+      return res.json({ schedule: null, events });
     }
 
     let schedules;
