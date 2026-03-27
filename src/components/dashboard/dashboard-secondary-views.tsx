@@ -36,6 +36,11 @@ const ImagePlaygroundPage = lazyWithRetry(() =>
     default: module.ImagePlaygroundPage,
   }))
 );
+const IntegrationsPage = lazyWithRetry(() =>
+  import("@/components/integrations/IntegrationsPage").then((module) => ({
+    default: module.IntegrationsPage,
+  }))
+);
 
 function FeatureSection({
   children,
@@ -190,6 +195,16 @@ export function DashboardSecondaryViews() {
             userId={userId ?? undefined}
             onAddImageToGallery={handleAddImageToGallery}
           />
+        </FeatureSection>
+      </div>
+    );
+  }
+
+  if (routeView === "integrations") {
+    return (
+      <div className="h-full">
+        <FeatureSection title="integrações">
+          <IntegrationsPage />
         </FeatureSection>
       </div>
     );

@@ -62,6 +62,7 @@ import { registerImagePlaygroundRoutes } from "./routes/image-playground.js";
 import { registerVideoPlaygroundRoutes } from "./routes/video-playground.js";
 import { registerAgentStudioRoutes } from "./routes/agent-studio.js";
 import { registerFeedbackRoutes } from "./routes/feedback.js";
+import { registerComposioRoutes } from "./routes/composio.js";
 
 // ---------------------------------------------------------------------------
 // App creation
@@ -201,6 +202,7 @@ const PROTECTED_API_PREFIXES = [
   "/api/agent",
   "/api/admin",
   "/api/feedback",
+  "/api/composio",
 ];
 
 for (const prefix of PROTECTED_API_PREFIXES) {
@@ -263,6 +265,7 @@ registerVideoPlaygroundRoutes(app, {
 });
 registerAgentStudioRoutes(app);
 registerFeedbackRoutes(app);
+registerComposioRoutes(app);
 registerApiDocs(app);
 
 // ---------------------------------------------------------------------------

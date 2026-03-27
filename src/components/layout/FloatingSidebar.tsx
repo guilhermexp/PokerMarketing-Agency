@@ -5,7 +5,7 @@ import { Tooltip, TooltipProvider } from "../common/Tooltip";
 import { Menu, X } from "lucide-react";
 import type { IconName } from "../../types";
 
-type View = "campaign" | "campaigns" | "carousels" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
+type View = "campaign" | "campaigns" | "carousels" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground" | "integrations";
 
 interface MenuItem {
   icon: IconName;
@@ -22,6 +22,7 @@ const menuItems: MenuItem[] = [
   { icon: "folder-open", label: "Galeria", key: "gallery" },
   { icon: "video", label: "Studio Video", key: "playground" },
   { icon: "image", label: "Image Studio", key: "image-playground" },
+  { icon: "link", label: "Integrações", key: "integrations" },
 ];
 
 interface FloatingSidebarProps {

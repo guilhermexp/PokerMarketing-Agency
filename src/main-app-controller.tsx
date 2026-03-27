@@ -13,7 +13,8 @@ export type ViewType =
   | "gallery"
   | "calendar"
   | "playground"
-  | "image-playground";
+  | "image-playground"
+  | "integrations";
 
 interface MainAppControllerProps {
   routeView: ViewType;

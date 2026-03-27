@@ -29,6 +29,7 @@ const VIEW_PATHS: Record<ViewType, string> = {
   calendar: "/calendar",
   playground: "/playground",
   "image-playground": "/image-playground",
+  integrations: "/integrations",
 };
 
 interface BrandProfileControllerValue {

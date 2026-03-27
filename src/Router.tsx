@@ -46,6 +46,11 @@ const ImagePlaygroundView = lazyWithRetry(() =>
     default: m.ImagePlaygroundView,
   })),
 );
+const IntegrationsView = lazyWithRetry(() =>
+  import('./views/integrations-view').then((m) => ({
+    default: m.IntegrationsView,
+  })),
+);
 
 export function Router() {
   return (
@@ -105,6 +110,10 @@ export function Router() {
         <Route
           path="/image-playground"
           element={<MainRoute><ImagePlaygroundView /></MainRoute>}
+        />
+        <Route
+          path="/integrations"
+          element={<MainRoute><IntegrationsView /></MainRoute>}
         />
         <Route path="*" element={<Navigate to="/campaign" replace />} />
       </Routes>
