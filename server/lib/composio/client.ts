@@ -59,7 +59,19 @@ export interface ComposioToolkit {
   logo: string;
   auth_schemes: string[] | null;
   composio_managed_auth_schemes: string[] | null;
-  meta?: Record<string, unknown>;
+}
+
+interface RawToolkit {
+  slug: string;
+  name: string;
+  auth_schemes: string[] | null;
+  composio_managed_auth_schemes: string[] | null;
+  meta?: {
+    logo?: string;
+    description?: string;
+    categories?: Array<{ id: string; name: string }>;
+    [key: string]: unknown;
+  };
 }
 
 export interface ComposioToolkitDetails extends ComposioToolkit {
@@ -72,9 +84,11 @@ export interface ComposioToolkitDetails extends ComposioToolkit {
 }
 
 interface ToolkitsListResponse {
-  items: ComposioToolkit[];
-  total_count: number;
-  cursor?: string;
+  items: RawToolkit[];
+  total_items?: number;
+  total_pages?: number;
+  current_page?: number;
+  next_cursor?: string;
 }
 
 export interface ComposioTool {
@@ -127,18 +141,37 @@ export async function listToolkits(params?: {
   );
 
   // Filter to only show toolkits with Composio-managed OAuth
-  const filtered = (data.items || []).filter((tk) => {
-    const managedSchemes = tk.composio_managed_auth_schemes || [];
-    return managedSchemes.length > 0;
-  });
+  // and normalize meta fields (logo, description) to top-level
+  const filtered: ComposioToolkit[] = (data.items || [])
+    .filter((tk) => {
+      const managedSchemes = tk.composio_managed_auth_schemes || [];
+      return managedSchemes.length > 0;
+    })
+    .map((tk) => ({
+      slug: tk.slug,
+      name: tk.name,
+      description: (tk.meta?.description as string) ?? "",
+      logo: (tk.meta?.logo as string) ?? "",
+      auth_schemes: tk.auth_schemes,
+      composio_managed_auth_schemes: tk.composio_managed_auth_schemes,
+    }));
 
-  return { toolkits: filtered, total: data.total_count };
+  return { toolkits: filtered, total: data.total_items ?? filtered.length };
 }
 
 export async function retrieveToolkit(
   slug: string,
 ): Promise<ComposioToolkitDetails> {
-  return composioFetch<ComposioToolkitDetails>(`/toolkits/${slug}`);
+  const raw = await composioFetch<RawToolkit & { initiation_fields?: ComposioToolkitDetails["initiation_fields"] }>(`/toolkits/${slug}`);
+  return {
+    slug: raw.slug,
+    name: raw.name,
+    description: (raw.meta?.description as string) ?? "",
+    logo: (raw.meta?.logo as string) ?? "",
+    auth_schemes: raw.auth_schemes,
+    composio_managed_auth_schemes: raw.composio_managed_auth_schemes,
+    initiation_fields: raw.initiation_fields,
+  };
 }
 
 export async function createAuthConfig(toolkitSlug: string): Promise<string> {
