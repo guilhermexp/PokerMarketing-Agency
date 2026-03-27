@@ -91,25 +91,19 @@ interface ToolsListResponse {
 }
 
 interface AuthConfigResponse {
-  id: string;
-  [key: string]: unknown;
+  toolkit: { slug: string };
+  auth_config: {
+    id: string;
+    auth_scheme: string;
+    is_composio_managed: boolean;
+  };
 }
 
 interface ConnectedAccountResponse {
   id: string;
   redirect_url?: string;
+  redirect_uri?: string;
   status?: string;
-  [key: string]: unknown;
-}
-
-interface McpServerResponse {
-  id: string;
-  [key: string]: unknown;
-}
-
-interface McpUrlResponse {
-  url?: string;
-  mcp_url?: string;
   [key: string]: unknown;
 }
 
@@ -158,7 +152,7 @@ export async function createAuthConfig(toolkitSlug: string): Promise<string> {
       },
     }),
   });
-  return data.id;
+  return data.auth_config.id;
 }
 
 export async function createConnectedAccount(
@@ -170,14 +164,14 @@ export async function createConnectedAccount(
     {
       method: "POST",
       body: JSON.stringify({
-        auth_config_id: authConfigId,
-        entity_id: entityId,
+        auth_config: { id: authConfigId },
+        connection: { entity_id: entityId },
       }),
     },
   );
   return {
     connectedAccountId: data.id,
-    redirectUrl: data.redirect_url ?? null,
+    redirectUrl: data.redirect_url ?? data.redirect_uri ?? null,
   };
 }
 
@@ -188,36 +182,6 @@ export async function getConnectedAccountStatus(
     `/connected_accounts/${connectedAccountId}`,
   );
   return (data.status ?? "unknown").toLowerCase();
-}
-
-export async function createMcpServer(
-  authConfigIds: string[],
-): Promise<string> {
-  const data = await composioFetch<McpServerResponse>("/mcp", {
-    method: "POST",
-    body: JSON.stringify({
-      auth_config_ids: authConfigIds,
-    }),
-  });
-  return data.id;
-}
-
-export async function generateMcpUrl(
-  mcpServerId: string,
-  connectedAccountIds: string[],
-): Promise<string> {
-  const data = await composioFetch<McpUrlResponse>("/mcp/generate-url", {
-    method: "POST",
-    body: JSON.stringify({
-      mcp_server_id: mcpServerId,
-      connected_account_ids: connectedAccountIds,
-    }),
-  });
-  const url = data.url ?? data.mcp_url;
-  if (!url) {
-    throw new Error("Composio did not return an MCP URL");
-  }
-  return url;
 }
 
 export async function listTools(

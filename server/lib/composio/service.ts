@@ -1,8 +1,10 @@
 /**
  * Composio Integration Service.
  *
- * Orchestrates the 6-step pipeline for creating Composio profiles
+ * Orchestrates the 3-step pipeline for creating Composio profiles
  * and provides CRUD operations for profile management.
+ *
+ * Pipeline: verify toolkit → create auth config → create connected account → save to DB
  */
 
 import { getSql } from "../db.js";
@@ -12,8 +14,6 @@ import {
   retrieveToolkit,
   createAuthConfig,
   createConnectedAccount,
-  createMcpServer,
-  generateMcpUrl,
   getConnectedAccountStatus,
   listToolkits as apiListToolkits,
   listTools as apiListTools,
@@ -47,7 +47,7 @@ interface EncryptedConfig {
   type: "composio";
   toolkit_slug: string;
   toolkit_name: string;
-  mcp_url: string;
+  auth_config_id: string;
   redirect_url: string | null;
   user_id: string;
   connected_account_id: string;
@@ -55,7 +55,7 @@ interface EncryptedConfig {
 }
 
 // ---------------------------------------------------------------------------
-// 6-Step Pipeline: Create Profile
+// Pipeline: Create Profile
 // ---------------------------------------------------------------------------
 
 export async function createComposioProfile(params: {
@@ -68,7 +68,7 @@ export async function createComposioProfile(params: {
 
   logger.info(
     { userId, toolkitSlug, profileName },
-    "[Composio] Starting 6-step profile creation pipeline",
+    "[Composio] Starting profile creation pipeline",
   );
 
   // Step 1: Verify toolkit exists
@@ -79,7 +79,7 @@ export async function createComposioProfile(params: {
   const authConfigId = await createAuthConfig(toolkitSlug);
   logger.debug({ authConfigId }, "[Composio] Step 2: Auth config created");
 
-  // Step 3: Create connected account (returns redirect_url for OAuth)
+  // Step 3: Create connected account (returns redirect_url for OAuth popup)
   const { connectedAccountId, redirectUrl } = await createConnectedAccount(
     authConfigId,
     userId,
@@ -89,20 +89,12 @@ export async function createComposioProfile(params: {
     "[Composio] Step 3: Connected account created",
   );
 
-  // Step 4: Create MCP server
-  const mcpServerId = await createMcpServer([authConfigId]);
-  logger.debug({ mcpServerId }, "[Composio] Step 4: MCP server created");
-
-  // Step 5: Generate MCP URL
-  const mcpUrl = await generateMcpUrl(mcpServerId, [connectedAccountId]);
-  logger.debug("[Composio] Step 5: MCP URL generated");
-
-  // Step 6: Save profile to database with encrypted config
+  // Step 4: Save profile to database with encrypted config
   const config: EncryptedConfig = {
     type: "composio",
     toolkit_slug: toolkitSlug,
     toolkit_name: toolkit.name,
-    mcp_url: mcpUrl,
+    auth_config_id: authConfigId,
     redirect_url: redirectUrl,
     user_id: userId,
     connected_account_id: connectedAccountId,
@@ -126,7 +118,7 @@ export async function createComposioProfile(params: {
   const profileId = (rows[0] as Record<string, unknown>).id as string;
   logger.info(
     { profileId, toolkitSlug },
-    "[Composio] Step 6: Profile saved to database",
+    "[Composio] Step 4: Profile saved to database",
   );
 
   return { profileId, redirectUrl };
