@@ -1,9 +1,20 @@
 /**
  * Marketplace modal — browse and connect Composio apps.
+ * Uses the app's Dialog and Input components.
  */
 
-import React, { useState, useMemo } from "react";
-import { X, Search, Loader2 } from "lucide-react";
+import React, { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Loader } from "@/components/common/Loader";
+import { Icon } from "@/components/common/Icon";
+import { Button } from "@/components/common/Button";
 import { useComposioToolkits } from "@/hooks/useComposio";
 import { ConnectWizard } from "./ConnectWizard";
 import type { ComposioToolkit } from "@/services/api/types/composioTypes";
@@ -39,115 +50,105 @@ export function MarketplaceModal({ open, onClose, onProfileCreated }: Marketplac
 
   const totalPages = Math.ceil(total / 20);
 
-  if (!open) return null;
-
-  if (selectedToolkit) {
-    return (
-      <ConnectWizard
-        toolkit={selectedToolkit}
-        onClose={() => setSelectedToolkit(null)}
-        onSuccess={() => {
-          setSelectedToolkit(null);
-          onProfileCreated();
-        }}
-      />
-    );
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Conectar App</h2>
-            <p className="text-sm text-zinc-400">
+    <>
+      <Dialog open={open && !selectedToolkit} onOpenChange={(v) => { if (!v) onClose(); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Conectar App</DialogTitle>
+            <DialogDescription>
               {total} apps disponiveis
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 text-zinc-400 hover:bg-white/10 hover:text-white"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+            </DialogDescription>
+          </DialogHeader>
 
-        {/* Search */}
-        <div className="border-b border-white/10 px-6 py-3">
+          {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-            <input
-              type="text"
+            <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Buscar apps..."
-              className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-blue-500"
+              className="pl-9"
             />
           </div>
-        </div>
 
-        {/* Grid */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
-            </div>
-          ) : toolkits.length === 0 ? (
-            <div className="py-12 text-center text-sm text-zinc-500">
-              Nenhum app encontrado
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {toolkits.map((toolkit) => (
-                <button
-                  key={toolkit.slug}
-                  onClick={() => setSelectedToolkit(toolkit)}
-                  className="flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-4 text-center transition-colors hover:border-white/20 hover:bg-white/[0.07]"
-                >
-                  {toolkit.logo ? (
-                    <img
-                      src={toolkit.logo}
-                      alt={toolkit.name}
-                      className="h-10 w-10 rounded-lg object-contain"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-lg font-bold text-white">
-                      {toolkit.name.charAt(0)}
-                    </div>
-                  )}
-                  <span className="text-xs font-medium text-white line-clamp-1">
-                    {toolkit.name}
-                  </span>
-                </button>
-              ))}
+          {/* Grid */}
+          <div className="flex-1 overflow-y-auto -mx-6 px-6">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader size={20} className="text-muted-foreground" />
+              </div>
+            ) : toolkits.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                Nenhum app encontrado
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 py-2">
+                {toolkits.map((toolkit) => (
+                  <button
+                    key={toolkit.slug}
+                    onClick={() => setSelectedToolkit(toolkit)}
+                    className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card/50 p-4 text-center transition-colors hover:bg-card hover:border-border/80"
+                  >
+                    {toolkit.logo ? (
+                      <img
+                        src={toolkit.logo}
+                        alt={toolkit.name}
+                        className="h-10 w-10 rounded-lg object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-lg font-bold text-white">
+                        {toolkit.name.charAt(0)}
+                      </div>
+                    )}
+                    <span className="text-xs font-medium text-foreground line-clamp-1">
+                      {toolkit.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 border-t border-border pt-3 -mx-6 px-6">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                Anterior
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {page} / {totalPages}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+              >
+                Proximo
+              </Button>
             </div>
           )}
-        </div>
+        </DialogContent>
+      </Dialog>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 border-t border-white/10 px-6 py-3">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="rounded-lg px-3 py-1 text-xs text-zinc-400 hover:bg-white/10 disabled:opacity-30"
-            >
-              Anterior
-            </button>
-            <span className="text-xs text-zinc-500">
-              {page} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="rounded-lg px-3 py-1 text-xs text-zinc-400 hover:bg-white/10 disabled:opacity-30"
-            >
-              Proximo
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+      {/* Connect Wizard (separate dialog) */}
+      {selectedToolkit && (
+        <ConnectWizard
+          toolkit={selectedToolkit}
+          open={!!selectedToolkit}
+          onOpenChange={(v) => { if (!v) setSelectedToolkit(null); }}
+          onSuccess={() => {
+            setSelectedToolkit(null);
+            onProfileCreated();
+          }}
+        />
+      )}
+    </>
   );
 }

@@ -1,11 +1,14 @@
 /**
- * Main integrations page — shows connected profiles and browse marketplace.
+ * Main integrations page — connected profiles grid + marketplace.
+ * Uses the app's EmptyState and Button components.
  */
 
 import React, { useState, useCallback } from "react";
-import { Plus, Loader2, Unplug } from "lucide-react";
 import { useComposioProfiles } from "@/hooks/useComposio";
 import { deleteProfile } from "@/services/api/composioApi";
+import { Button } from "@/components/common/Button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { Loader } from "@/components/common/Loader";
 import { AppCard } from "./AppCard";
 import { MarketplaceModal } from "./MarketplaceModal";
 
@@ -31,38 +34,33 @@ export function IntegrationsPage() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Integrações</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <h1 className="text-xl font-bold text-white">Integrações</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Conecte seus apps favoritos via OAuth
           </p>
         </div>
-        <button
+        <Button
+          variant="primary"
+          icon="plus"
           onClick={() => setMarketplaceOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500"
         >
-          <Plus className="h-4 w-4" />
           Conectar App
-        </button>
+        </Button>
       </div>
 
-      {/* Connected Profiles Grid */}
+      {/* Connected Profiles */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+          <Loader size={20} className="text-muted-foreground" />
         </div>
       ) : profiles.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-16">
-          <Unplug className="mb-3 h-10 w-10 text-zinc-600" />
-          <p className="text-sm text-zinc-400">
-            Nenhuma integracao conectada
-          </p>
-          <button
-            onClick={() => setMarketplaceOpen(true)}
-            className="mt-3 text-sm text-blue-400 hover:underline"
-          >
-            Conectar primeiro app
-          </button>
-        </div>
+        <EmptyState
+          title="Nenhuma integracao conectada"
+          description="Conecte apps como YouTube, Slack, Google Calendar e mais para expandir as capacidades do seu agente."
+          actionLabel="Conectar primeiro app"
+          actionIcon="plus"
+          onAction={() => setMarketplaceOpen(true)}
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {profiles.map((profile) => (
