@@ -12,7 +12,7 @@ describe("static-cache", () => {
     const setHeader = vi.fn();
 
     applyStaticCacheHeaders(
-      { setHeader } as { setHeader: (name: string, value: string) => void },
+      { setHeader } as unknown as import("express").Response,
       "/app/dist/index.html",
     );
 
@@ -26,7 +26,7 @@ describe("static-cache", () => {
     const setHeader = vi.fn();
 
     applyStaticCacheHeaders(
-      { setHeader } as { setHeader: (name: string, value: string) => void },
+      { setHeader } as unknown as import("express").Response,
       "/app/dist/assets/index-C6hdOEpe.js",
     );
 
@@ -41,7 +41,7 @@ describe("static-cache", () => {
 
     applySpaHtmlHeaders({
       setHeader,
-    } as { setHeader: (name: string, value: string) => void });
+    } as unknown as import("express").Response);
 
     expect(setHeader).toHaveBeenCalledWith(
       "Cache-Control",

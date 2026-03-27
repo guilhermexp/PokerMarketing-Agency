@@ -118,10 +118,10 @@ export class AppError extends Error {
   constructor(message: string, statusCode: number, details?: ErrorDetails | null);
   constructor(
     message: string,
-    code: string = ERROR_CODES.INTERNAL_SERVER_ERROR,
-    statusCode: number = HTTP_STATUS.INTERNAL_SERVER_ERROR,
-    isOperational: boolean = true,
-    details: ErrorDetails | null = null
+    code?: string,
+    statusCode?: number,
+    isOperational?: boolean,
+    details?: ErrorDetails | null
   );
   constructor(
     message: string,

@@ -235,7 +235,7 @@ function logAdminRequest(
   logAdminAction(actor.adminUserId, adminAction, {
     adminEmail: actor.adminEmail,
     result,
-    requestId: req.id,
+    requestId: String(req.id),
     method: req.method,
     path: req.path,
     ...details,
@@ -798,8 +798,8 @@ export function registerAdminRoutes(app: Express): void {
       logAdminRequest(req, "admin.logs.list", "success", {
         page: safePage,
         limit: safeLimit,
-        category: category || null,
-        status: status || null,
+        category: categoryParam || null,
+        status: severityParam || null,
       });
       res.json({
         logs,

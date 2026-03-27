@@ -64,7 +64,7 @@ describe("API contracts", () => {
   });
 
   it("tracks every registered route contract centrally", () => {
-    expect(routeContracts).toHaveLength(98);
+    expect(routeContracts).toHaveLength(99);
     expect(getRouteContract("POST", "/api/feedback")).toBeDefined();
   });
 });

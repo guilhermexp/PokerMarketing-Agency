@@ -1,0 +1,21 @@
+{
+  "name": "sociallab-cli",
+  "version": "1.0.0",
+  "description": "CLI for SocialLab (PokerMarketing-Agency) - AI-powered poker marketing toolkit",
+  "type": "module",
+  "bin": {
+    "sociallab": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -488,6 +488,12 @@ function getAdminAuditContext(
 
 export async function requireSuperAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    if (req.internalAuth?.userId) {
+      req.adminEmail = "internal";
+      next();
+      return;
+    }
+
     const session = req.authSession as AuthSession | null | undefined;
 
     if (!session?.user?.id) {

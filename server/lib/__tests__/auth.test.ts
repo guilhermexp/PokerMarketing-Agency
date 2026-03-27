@@ -60,4 +60,28 @@ describe("requireSuperAdmin", () => {
     expect(json).toHaveBeenCalledWith({ error: "Access denied. Super admin only." });
     expect(next).not.toHaveBeenCalled();
   });
+
+  it("allows trusted internal auth bypass for admin endpoints", async () => {
+    vi.resetModules();
+    const { requireSuperAdmin } = await import("../auth.js");
+
+    const req = {
+      id: "req-2",
+      method: "GET",
+      path: "/api/admin/stats",
+      internalAuth: {
+        userId: "internal-user",
+        orgId: null,
+      },
+      authSession: null,
+    } as unknown as Request;
+    const res = {
+      status: vi.fn(),
+    } as unknown as Response;
+    const next = vi.fn() as unknown as NextFunction;
+
+    await requireSuperAdmin(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
 });
