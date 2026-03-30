@@ -7,9 +7,11 @@ import {
   getProfiles,
   getToolkits,
   getProfileStatus,
+  getToolsForToolkit,
 } from "@/services/api/composioApi";
 import type {
   ComposioProfile,
+  ComposioTool,
   ComposioToolkit,
   ProfileStatus,
 } from "@/services/api/types/composioTypes";
@@ -46,6 +48,21 @@ export function useComposioToolkits(search?: string, page = 1) {
   return {
     toolkits: data?.toolkits ?? [],
     total: data?.total ?? 0,
+    isLoading,
+    error,
+  };
+}
+
+export function useComposioTools(toolkitSlug: string | null) {
+  const { data, error, isLoading } = useSWR(
+    toolkitSlug ? `composio:tools:${toolkitSlug}` : null,
+    () => getToolsForToolkit(toolkitSlug!),
+    { revalidateOnFocus: false },
+  );
+
+  return {
+    tools: data?.tools ?? [],
+    count: data?.count ?? 0,
     isLoading,
     error,
   };

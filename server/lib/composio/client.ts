@@ -225,7 +225,7 @@ export async function listTools(
   toolkitSlug: string,
 ): Promise<ComposioTool[]> {
   const data = await composioFetch<ToolsListResponse>(
-    `/tools?toolkit=${toolkitSlug}`,
+    `/tools?toolkit_slug=${toolkitSlug}&limit=100`,
   );
   return data.items ?? data.tools ?? [];
 }
