@@ -7,6 +7,7 @@ export interface ComposioToolkit {
   name: string;
   description: string;
   logo: string;
+  tools_count: number;
   auth_schemes: string[] | null;
   composio_managed_auth_schemes: string[] | null;
 }

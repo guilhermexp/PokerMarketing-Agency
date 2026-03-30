@@ -57,6 +57,7 @@ export interface ComposioToolkit {
   name: string;
   description: string;
   logo: string;
+  tools_count: number;
   auth_schemes: string[] | null;
   composio_managed_auth_schemes: string[] | null;
 }
@@ -69,6 +70,7 @@ interface RawToolkit {
   meta?: {
     logo?: string;
     description?: string;
+    tools_count?: number;
     categories?: Array<{ id: string; name: string }>;
     [key: string]: unknown;
   };
@@ -152,6 +154,7 @@ export async function listToolkits(params?: {
       name: tk.name,
       description: (tk.meta?.description as string) ?? "",
       logo: (tk.meta?.logo as string) ?? "",
+      tools_count: tk.meta?.tools_count ?? 0,
       auth_schemes: tk.auth_schemes,
       composio_managed_auth_schemes: tk.composio_managed_auth_schemes,
     }));
@@ -168,6 +171,7 @@ export async function retrieveToolkit(
     name: raw.name,
     description: (raw.meta?.description as string) ?? "",
     logo: (raw.meta?.logo as string) ?? "",
+    tools_count: raw.meta?.tools_count ?? 0,
     auth_schemes: raw.auth_schemes,
     composio_managed_auth_schemes: raw.composio_managed_auth_schemes,
     initiation_fields: raw.initiation_fields,

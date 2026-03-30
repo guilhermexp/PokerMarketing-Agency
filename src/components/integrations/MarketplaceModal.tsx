@@ -104,6 +104,11 @@ export function MarketplaceModal({ open, onClose, onProfileCreated }: Marketplac
                     <span className="text-xs font-medium text-foreground line-clamp-1">
                       {toolkit.name}
                     </span>
+                    {toolkit.tools_count > 0 && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {toolkit.tools_count} tools
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
